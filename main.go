@@ -1,7 +1,8 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -28,24 +29,24 @@ func parseXML(xml string) string {
 func main() {
 	http.HandleFunc("/parse-xml", func(w http.ResponseWriter, r *http.Request) {
 		// FORM DATA
-		err := r.ParseMultipartForm(32 << 20)
-		check(err)
-
 		errPF := r.ParseForm()
 		check(errPF)
 
-		_, headerF, errF := r.FormFile("xml")
-		check(errF)
+		file, _, errF := r.FormFile("xml")
+		if errF != nil {
+			log.Fatal(errF)
+		}
+		defer file.Close()
 
-		fBuff := make([]byte, headerF.Size)
-
-		res := parseXML(string(fBuff))
-
-		h, err := json.Marshal(res)
+		buf := bytes.NewBuffer(nil)
+		_, err := io.Copy(buf, file)
 		check(err)
+		bbuf := buf.Bytes()
+
+		res := parseXML(string(bbuf))
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(h)
+		w.Write([]byte(res))
 	})
-	log.Fatal(http.ListenAndServe(":6060", nil))
+	log.Fatal(http.ListenAndServe(":4040", nil))
 }
